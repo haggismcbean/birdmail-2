@@ -1,0 +1,241 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Birdmail Newsletter Generator</title>
+    <style type="text/css">
+      body {
+        font-family: monospace;
+        line-height: 1.6em;
+      }
+
+      .entries-list-container {
+        max-height: 600px;
+        overflow-y: scroll;
+        border: 1px solid black;
+        margin: 1rem;
+      }
+
+      .entry-text {
+        width: 700px;
+        max-height: 300px;
+        white-space: break-spaces;
+        background: white;
+      }
+
+      form {
+        border: 1px solid black;
+        margin: 1rem;
+      }
+
+      .main {
+        width: 700px;
+      }
+    </style>
+  </head>
+  <body style="background: #006600;">
+  	<main id="main">
+
+      <h1>Birdmail Newsletter Generator</h1>
+
+  <form>
+		<p>Previous edition [as html]</p>
+		<textarea  style="height: 300px; width: 700px" name="message" id="previous-version" type="text"></textarea>
+		<br/>
+    <select name="type" id="message-type" type="text">
+      <option value="article">Article</option>
+      <option value="billing">Billing</option>
+      <option value="message">Message</option>
+    </select>
+    <br>
+    <label>Cutoff Date</label>
+    <input type="number" id="messages-cutoff"/>
+    <label>[Articles and messages written before that date will appear 'below the fold']</label>
+    <br>
+    <label>Title</label>
+    <input type="text" id="message-title"/>
+    <br>
+    <label>Author</label>
+    <input type="text" id="message-author"/>
+    <br>
+    <label>Created At</label>
+    <input type="number" id="message-date"/>
+    <br>
+    <label>To</label>
+    <input type="text" id="message-to"/>
+    <label>[Only required for messages]</label>
+    <br>
+    <br>
+    <textarea style="height: 300px; width: 700px" name="message" id="message-text" type="text"></textarea>
+    <br>
+  </form>
+    <button id="generateButton">Generate Birdmail</button>
+  <button id="copyButton">Copy HTML</button>
+
+  <div id="elementToCopy">
+  </div>
+
+    </main>
+
+    <script type="text/javascript">
+    	const generateButton = document.getElementById('generateButton');
+
+    	generateButton.addEventListener('click', () => {
+    		document.getElementById('elementToCopy').innerHTML = ''
+
+	      const generateButton = document.getElementById('generateButton');
+
+    		const birdmailInput = document.getElementById('previous-version').value;
+    		const doc = new DOMParser().parseFromString(birdmailInput, "text/html")
+    		const cutoffDate = Number(document.getElementById('messages-cutoff').value);
+
+    		const messageInput = document.getElementById('message-text').value;
+        const messageTitle = document.getElementById('message-title').value;
+        const messageDate = document.getElementById('message-date').value;
+        const messageAuthor = document.getElementById('message-author').value;
+        const messageTo = document.getElementById('message-to').value;
+        const messageSelect = document.getElementById('message-type').value;
+
+        const message = {
+        	title: messageTitle,
+        	author: messageAuthor,
+        	to: messageTo,
+        	createdAt: Number(messageDate),
+        	text: messageInput
+        }
+
+        const articles = getPreviousArticles(doc, 'outer-articles-container', 'articles-container');
+        const messages = getPreviousArticles(doc, 'outer-messages-container', 'messages-container');
+        const billings = getPreviousArticles(doc, undefined, 'adz-container');
+
+        console.log(doc)
+        // document.body.appendChild(doc.head.innerHTML);
+        const main = document.getElementById('elementToCopy')
+        main.innerHTML += doc.body.innerHTML
+        main.innerHTML += doc.head.innerHTML
+
+        if (messageSelect === 'article') {
+        	addNewArticle(message, cutoffDate)
+        }
+
+        if (messageSelect === 'message') {
+        	addNewMessage(message, cutoffDate)
+        }
+
+        if (messageSelect === 'billing') {
+        	addNewBilling(message, cutoffDate)
+        }
+
+        articles.slice(0, messageSelect === 'article' ? 4 : 5).forEach((article) => (addArticle(article, cutoffDate)))
+        messages.slice(0, messageSelect === 'message' ? 5 : 6).forEach((article) => (addMessage(article, cutoffDate)))
+        billings.forEach((article) => (addBilling(article, cutoffDate)))
+
+        const copyButton = document.getElementById('copyButton');
+	      const elementToCopy = document.getElementById('elementToCopy');
+	      copyButton.addEventListener('click', () => {
+	      	console.log('err clicked');
+
+	        // Create a temporary textarea element to hold the content
+	        const tempTextarea = document.createElement('textarea');
+	        tempTextarea.value = elementToCopy.innerHTML;
+	        document.body.appendChild(tempTextarea);
+
+	        // Select and copy the content
+	        tempTextarea.select();
+	        document.execCommand('copy');
+
+	        // Remove the temporary textarea
+	        document.body.removeChild(tempTextarea);
+
+	        alert('InnerHTML copied to clipboard!');
+	      });
+    	})
+
+    	function getPreviousArticles(birdmail, outerSelector, innerSelector) {
+    		let outerArticles = [];
+
+    		if (outerSelector) {
+    			outerArticles = birdmail.getElementById(outerSelector).children
+    		}
+    		const innerArticles = birdmail.getElementById(innerSelector).children
+
+    		const articles = [
+    			...outerArticles,
+    			...innerArticles
+    		]
+
+    		const result = articles.map(article => (article.cloneNode(true)))
+
+    		articles.forEach(article => (article.remove()));
+
+    		return result;
+    	}
+
+    	function addArticle(message, previousPublication) {
+    		const createdAt = Number(message.getElementsByClassName('date')[0].innerHTML.split(' ')[1])
+
+        if (createdAt > previousPublication) {
+        	document.getElementById('outer-articles-container').appendChild(message)
+        } else {
+        	document.getElementById('articles-container').appendChild(message)
+        }
+      }
+
+      function addBilling(message, previousPublication) {
+        document.getElementById('adz-container').appendChild(message)
+      }
+
+      function addMessage(message, previousPublication) {
+      	const createdAt = Number(message.getElementsByClassName('date')[0].innerHTML.split(' ')[1])
+
+        if (createdAt > previousPublication) {
+        	document.getElementById('outer-messages-container').appendChild(message)
+        } else {
+        	document.getElementById('messages-container').appendChild(message)
+        }
+      }
+
+      function addNewArticle(message, previousPublication) {
+        if (message.createdAt > previousPublication) {
+        document.getElementById('outer-articles-container').innerHTML += `<div class="message"><h3>
+${message.title}</h3>
+<div class="from">Author: ${message.author}</div><div class="date">
+Date: ${message.createdAt}</div><div class="contents contents-flex"><div class="text-column">
+${message.text}
+        </div></div></div>`
+        } else {
+        document.getElementById('articles-container').innerHTML += `<div class="message"><h3>
+${message.title}</h3>
+<div class="from">Author: ${message.author}</div><div class="date">
+Date: ${message.createdAt}</div><div class="contents contents-flex"><div class="text-column">
+${message.text}
+        </div></div></div>`
+        }
+
+      }
+
+      function addNewBilling(message, previousPublication) {
+        document.getElementById('adz-container').innerHTML += message.text
+      }
+
+      function addNewMessage(message, previousPublication) {
+
+        if (message.createdAt > previousPublication) {
+        document.getElementById('outer-messages-container').innerHTML += `<div class="message"><h3>
+${message.title}</h3>
+<div class="from">From: ${message.author}</div><div class="to">To: ${message.to}</div><div class="date">Date: ${message.createdAt}</div><div class="contents contents-flex"><div class="text-column">
+${message.text}
+        </div></div></div>`
+
+        } else {
+        document.getElementById('messages-container').innerHTML += `<div class="message"><h3>
+${message.title}</h3>
+<div class="from">From: ${message.author}</div><div class="to">To: ${message.to}</div><div class="date">Date: ${message.createdAt}</div><div class="contents contents-flex"><div class="text-column">
+${message.text}
+        </div></div></div>`
+        }
+      }
+    </script>
+  <br>
+	</body>
+</html>
